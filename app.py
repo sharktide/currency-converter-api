@@ -7,12 +7,13 @@ app = FastAPI()
 
 import os
 
+# Access the API key from the secret
 API_KEY = os.getenv("apikey")
 
 API_URL = f"https://v6.exchangerate-api.com/v6/{API_KEY}/latest/USD"
 CACHE = None
 LAST_FETCH_TIME = None
-CACHE_TTL = 86400
+CACHE_TTL = 86400  # Time to live for cache in seconds (1 day)
 
 def fetch_exchange_rates():
     """Fetch the exchange rates from the API."""
@@ -26,11 +27,13 @@ def get_cached_rates():
     """Return cached rates if they exist and are not expired."""
     global CACHE, LAST_FETCH_TIME
 
+    # Check if the cache is expired
     if CACHE is None or (time.time() - LAST_FETCH_TIME) > CACHE_TTL:
+        # Cache is either not set or expired, fetch new rates
         rates_data = fetch_exchange_rates()
         if rates_data:
             CACHE = rates_data
-            LAST_FETCH_TIME = time.time() 
+            LAST_FETCH_TIME = time.time()  # Update the fetch time
         else:
             return {"error": "Failed to fetch exchange rates"}
     
@@ -58,3 +61,15 @@ async def convert_currency(amount: float, from_currency: str, to_currency: str):
         return {"converted_amount": converted_amount}
     except KeyError:
         return {"error": "Invalid currency code"}
+
+@app.get("/supported-currencies")
+async def get_supported_currencies():
+    """Endpoint to return the list of supported currencies."""
+    rates = get_cached_rates()
+
+    if "error" in rates:
+        return {"error": "Failed to fetch exchange rates"}
+
+    # Extract the keys (currency codes) from the conversion_rates field
+    supported_currencies = list(rates["conversion_rates"].keys())
+    return {"currencies": supported_currencies}
